@@ -58,6 +58,13 @@
             "scriptUrl": "https://raw.githubusercontent.com/ste26008799-maker/repo/main/plugins/misskon_plugin.js",
             "iconUrl": "https://misskon.com/favicon.ico"
         },
+         {
+            "id": "vlxxai",
+            "name": "Vlxxai",
+            "version": "1.0.0",
+            "scriptUrl": "https://raw.githubusercontent.com/ste26008799-maker/repo/main/plugins/vlxxai.js",
+            "iconUrl": "https://raw.githubusercontent.com/ste26008799-maker/repo/main/plugins/vlxx.ico"
+        },
         {
             "id": "clbpx",
             "name": "CLB Phim Xưa",
