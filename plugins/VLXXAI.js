@@ -32,8 +32,7 @@ function getPrimaryCategories() {
         { name: 'PHIM HOT ĐỀ CỬ', slug: 'DC' },
         { name: 'Mới Cập Nhật', slug: 'MCN' },
         { name: 'Đã Hoàn Thành', slug: 'dht' },
-        { name: 'Đang Cập Nhật', slug: 'dcn' },
-        
+        { name: 'Đang Cập Nhật', slug: 'dcn' }
     ]);
 }
 
@@ -74,9 +73,6 @@ function getUrlSearch(keyword, filtersJson) {
     return url;
 }
 
-// getUrlDetail: App gọi với episode.id
-// episode.id = canonical URL (có thể kèm #s2 cho server 2)
-// Trả về URL as-is (starts with http) → App fetch trang detail
 function getUrlDetail(slug) {
     if (!slug) return "";
     if (slug.indexOf("http") === 0) return slug;
@@ -191,20 +187,12 @@ function parseMovieDetail(html) {
             }
         }
 
-        // =====================================================================
-        // episode.id = canonical URL + #s{serverId}
-        // Khi user bấm xem → App gọi getUrlDetail(url#s1) → fetch trang detail
-        // → parseDetailResponse trích data-id + server từ fragment → trả AJAX POST
-        // =====================================================================
-
         var servers = [];
 
-        // Lấy canonical URL
         var canonicalMatch = html.match(/<link[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["']/i)
             || html.match(/<meta[^>]*property=["']og:url["'][^>]*content=["']([^"']+)["']/i);
         var pageUrl = canonicalMatch ? canonicalMatch[1] : "";
 
-        // Tìm server buttons: onclick="server(1,3105)" onclick="server(2,3105)"
         var serverRegex = /onclick=["']server\((\d+),\s*(\d+)\)["']/gi;
         var srvMatch;
 
@@ -220,7 +208,6 @@ function parseMovieDetail(html) {
             });
         }
 
-        // Fallback nếu không tìm thấy server buttons
         if (servers.length === 0 && pageUrl) {
             servers.push({
                 name: "Server #1",
@@ -233,7 +220,7 @@ function parseMovieDetail(html) {
         }
 
         return JSON.stringify({
-            id: "",
+            id: pageUrl, // Đã sửa từ id: "" thành id: pageUrl
             title: title.replace(/<[^>]+>/g, '').trim(),
             posterUrl: posterUrl,
             backdropUrl: posterUrl,
@@ -256,18 +243,14 @@ function parseMovieDetail(html) {
 }
 
 // =============================================================================
-// STREAM RESOLUTION (3-step: detail page → AJAX POST → embed page)
+// STREAM RESOLUTION
 // =============================================================================
 
-// parseDetailResponse: Nhận HTML tĩnh từ detail page
-// Trích data-id + server number → trả AJAX POST config cho App
 function parseDetailResponse(html, fetchedUrl) {
     try {
-        // Trích data-id từ HTML
         var dataIdMatch = html.match(/data-id=["'](\d+)["']/i);
         var videoId = dataIdMatch ? dataIdMatch[1] : "";
 
-        // Fallback: lấy ID từ URL path (ví dụ: /video/.../3105/)
         if (!videoId && fetchedUrl) {
             var urlIdMatch = fetchedUrl.match(/\/(\d+)\/?(?:#|$)/);
             if (urlIdMatch) videoId = urlIdMatch[1];
@@ -277,19 +260,16 @@ function parseDetailResponse(html, fetchedUrl) {
             return JSON.stringify({ url: "", isEmbed: false, headers: {} });
         }
 
-        // Trích server number từ URL fragment (#s1, #s2)
         var serverId = "1";
         if (fetchedUrl) {
             var fragMatch = fetchedUrl.match(/#s(\d+)/);
             if (fragMatch) serverId = fragMatch[1];
         }
 
-        // Trích device type từ HTML
         var deviceMatch = html.match(/deviceType\s*=\s*['"](\w+)['"]/i);
         var deviceType = deviceMatch ? deviceMatch[1] : "mobile";
         var vlxxServer = (deviceType === "desktop") ? "1" : "2";
 
-        // Trả config để App POST tới /ajax.php
         return JSON.stringify({
             url: "https://vlxxai.com/ajax.php",
             isEmbed: true,
@@ -304,36 +284,26 @@ function parseDetailResponse(html, fetchedUrl) {
     }
 }
 
-// parseEmbedResponse: Xử lý 2 loại response:
-// Depth 1 - AJAX JSON: {"player":"<iframe src=\"...\">"}  → trích iframe URL
-// Depth 2 - Embed HTML: JWPlayer sources với .vl URL      → trích stream URL
 function parseEmbedResponse(html, url) {
     try {
-        // === CASE 1: AJAX JSON response (chứa "player" key) ===
-        // Response dạng: {"player":"<iframe src=\"https:\/\/play.vlstream.net\/embed\/hash\/s1\" ...>"}
-        // Cần JSON.parse để unescape \/ thành / và \" thành "
         if (html.indexOf('"player"') !== -1) {
             try {
                 var jsonObj = JSON.parse(html);
                 if (jsonObj && jsonObj.player) {
                     var playerHtml = jsonObj.player;
-                    // playerHtml giờ là clean HTML: <iframe src="https://play.vlstream.net/embed/hash/s1" ...>
                     var srcMatch = playerHtml.match(/src=["']([^"']+)["']/i);
                     if (srcMatch) {
                         return JSON.stringify({
                             url: srcMatch[1],
                             isEmbed: true,
                             headers: {
-                                "Referer": "https://vlxai.com/"
+                                "Referer": "https://vlxxai.com/" // Đã sửa lỗi vlxai.com thành vlxxai.com
                             }
                         });
                     }
                 }
             } catch (parseErr) {
-                // Fallback: regex trên raw JSON string
-                // Unescape \/ trước khi match
                 var cleaned = html.replace(/\\\//g, '/');
-                // Match src=\"URL\" hoặc src=\\"URL\\"
                 var iframeMatch = cleaned.match(/src=(?:\\\\)?["'](https?:\/\/[^"'\\]+)(?:\\\\)?["']/i);
                 if (iframeMatch) {
                     return JSON.stringify({
@@ -347,7 +317,6 @@ function parseEmbedResponse(html, url) {
             }
         }
 
-        // === CASE 2: Embed page HTML (JWPlayer with .vl sources) ===
         var fileMatch = html.match(/"file"\s*:\s*"(https?[^"]+\.vl[^"]*)"/i);
         if (fileMatch) {
             return JSON.stringify({
@@ -360,7 +329,6 @@ function parseEmbedResponse(html, url) {
             });
         }
 
-        // Thử parse sources array
         var sourcesMatch = html.match(/sources\s*:\s*(\[[^\]]+\])/i);
         if (sourcesMatch) {
             try {
@@ -392,7 +360,6 @@ function parseEmbedResponse(html, url) {
             }
         }
 
-        // Tìm bất kỳ URL .vl nào
         var vlMatch = html.match(/(https?:\/\/[^\s"'\\]+\.vl[^\s"'\\]*)/i);
         if (vlMatch) {
             return JSON.stringify({
@@ -405,7 +372,6 @@ function parseEmbedResponse(html, url) {
             });
         }
 
-        // Không tìm được gì → trả empty để dừng recursive loop
         return JSON.stringify({ url: "", isEmbed: false, headers: {} });
     } catch (e) {
         return JSON.stringify({ url: "", isEmbed: false, headers: {} });
