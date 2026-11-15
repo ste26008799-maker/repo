@@ -19,27 +19,21 @@ function getManifest() {
 
 function getHomeSections() {
     return JSON.stringify([
-        { slug: 'jav', title: 'Phim JAV', type: 'Horizontal', path: 'category' },
-        { slug: 'phim-sex-hay', title: 'Phim Sex Hay', type: 'Horizontal', path: 'category' },
-        { slug: 'vietsub', title: 'Phim Sex Vietsub', type: 'Horizontal', path: 'category' },
-        { slug: 'khong-che', title: 'Không Che', type: 'Horizontal', path: 'category' },
+        { slug: 'DC', title: 'PHIM HOT ĐỀ CỬ', type: 'Horizontal', path: 'category' },
+        { slug: 'MCN', title: 'Mới Cập Nhật', type: 'Horizontal', path: 'category' },
+        { slug: 'dht', title: 'Đã Hoàn Thành', type: 'Horizontal', path: 'category' },
+        { slug: 'dcn', title: 'Đang Cập Nhật', type: 'Horizontal', path: 'category' },
         { slug: 'home', title: 'Phim Sex Mới', type: 'Grid', path: '' }
     ]);
 }
 
 function getPrimaryCategories() {
     return JSON.stringify([
-        { name: 'JAV', slug: 'jav' },
-        { name: 'Phim Sex Hay', slug: 'phim-sex-hay' },
-        { name: 'Vietsub', slug: 'vietsub' },
-        { name: 'Không Che', slug: 'khong-che' },
-        { name: 'Sex Học Sinh', slug: 'hoc-sinh' },
-        { name: 'Vụng Trộm', slug: 'vung-trom' },
-        { name: 'Phim Cấp 3', slug: 'cap-3' },
-        { name: 'Mỹ - Châu Âu', slug: 'chau-au' },
-        { name: 'XVIDEOS', slug: 'xvideos' },
-        { name: 'XNXX', slug: 'xnxx' },
-        { name: 'XXX', slug: 'xxx' }
+        { name: 'PHIM HOT ĐỀ CỬ', slug: 'DC' },
+        { name: 'Mới Cập Nhật', slug: 'MCN' },
+        { name: 'Đã Hoàn Thành', slug: 'dht' },
+        { name: 'Đang Cập Nhật', slug: 'dcn' },
+        
     ]);
 }
 
