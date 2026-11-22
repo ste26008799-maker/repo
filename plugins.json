@@ -38,11 +38,11 @@
         },
         
          {
-            "id": "vlxxai",
-            "name": "VLXXAI",
-            "version": "1.0.0",
-            "scriptUrl": "https://raw.githubusercontent.com/ste26008799-maker/repo/main/plugins/VLXXAI.js",
-            "iconUrl": "https://raw.githubusercontent.com/ste26008799-maker/repo/main/plugins/vlxx.ico"
+            "id": "vlxx",
+            "name": "VLXX",
+            "version": "1.0.5",
+            "scriptUrl": "https://raw.githubusercontent.com/ste26008799-maker/repo/main/plugins/vlxx_plugin.js",
+            "iconUrl": "https://raw.githubusercontent.com/ste26008799-maker/repo/main/plugins/clbpx.ico"
         },
         {
             "id": "clbpx",
