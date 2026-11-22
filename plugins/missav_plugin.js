@@ -6,13 +6,15 @@ function getManifest() {
     return JSON.stringify({
         "id": "missav",
         "name": "MissAV",
-        "version": "1.0.3",
-        "baseUrl": "https://missav.ai",
-        "iconUrl": "https://stpaulclinic.vn/vaapp/plugins/missav.ico",
+        "version": "1.1.3",
+        "baseUrl": "https://missav.media",
+        "referrer": "https://missav123.com/",
+        "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/missav.ico",
         "isEnabled": true,
         "isAdult": true,
-        "type": "VIDEO",
-        "layoutType": "HORIZONTAL"
+        "type": "MOVIE",
+        "layoutType": "HORIZONTAL",
+        "subtitleCat": true
     });
 }
 
@@ -104,7 +106,7 @@ function getFilterConfig() {
 function getUrlList(slug, filtersJson) {
     var filters = JSON.parse(filtersJson || "{}");
     var page = filters.page || 1;
-    var baseUrl = "https://missav.ai"; // Removed trailing slash
+    var baseUrl = "https://missav.media";
 
     // If slug is empty (default), use 'vi/new'
     var path = slug || "vi/new";
@@ -131,16 +133,16 @@ function getUrlList(slug, filtersJson) {
 function getUrlSearch(keyword, filtersJson) {
     var filters = JSON.parse(filtersJson || "{}");
     var page = filters.page || 1;
-    return "https://missav.ai/vi/search/" + encodeURIComponent(keyword) + "?page=" + page;
+    return "https://missav.media/vi/search/" + encodeURIComponent(keyword) + "?page=" + page;
 }
 
 function getUrlDetail(slug) {
     if (slug.indexOf("http") === 0) return slug;
-    if (slug.indexOf("/") === 0) return "https://missav.ai" + slug;
-    return "https://missav.ai/vi/" + slug;
+    if (slug.indexOf("/") === 0) return "https://missav.media" + slug;
+    return "https://missav.media/vi/" + slug;
 }
 
-function getUrlCategories() { return "https://missav.ai/vi/genres"; }
+function getUrlCategories() { return "https://missav.media/vi/genres"; }
 function getUrlCountries() { return ""; } // Not supported
 function getUrlYears() { return ""; } // Not supported
 
@@ -149,6 +151,20 @@ function getUrlYears() { return ""; } // Not supported
 // =============================================================================
 
 var PluginUtils = {
+    /**
+     * Strip prefix missav_media- (hoặc bất kỳ prefix dạng domain_) khỏi CSS class names.
+     * Ví dụ: class="missav_media-thumbnail missav_media-group" -> class="thumbnail group"
+     * Điều này đảm bảo parser hoạt động với cả HTML cũ và mới.
+     */
+    normalizeHtml: function (html) {
+        if (!html) return "";
+        // Strip missav_media- prefix trong class attributes
+        // Pattern: tìm class="..." rồi strip prefix bên trong
+        return html.replace(/class="([^"]*)"/g, function (fullMatch, classValue) {
+            var normalized = classValue.replace(/missav_media-/g, '');
+            return 'class="' + normalized + '"';
+        });
+    },
     cleanText: function (text) {
         if (!text) return "";
         return text.replace(/<[^>]*>/g, "")
@@ -173,10 +189,40 @@ var PluginUtils = {
             results.push(match[1]);
         }
         return results;
+    },
+    /**
+     * Tối ưu hóa việc lấy Preview URL bằng 3 bước Strategy tương tự như lấy link phim
+     */
+    extractPreviewUrl: function (itemHtml) {
+        // Strategy 1: Regex cơ bản từ data-src của thẻ video
+        var previewMatch = itemHtml.match(/<video[^>]+data-src="([^"]+)"/);
+        var url = previewMatch ? previewMatch[1] : "";
+        
+        // Strategy 2: Nếu chỉ là UUID (36 ký tự) thì dựng link surrit
+        if (url && url.length === 36 && url.match(/^[0-9a-f-]{36}$/i)) {
+            return "https://surrit.com/" + url + "/preview.mp4";
+        }
+        
+        // Strategy 3: Deep Scan UUID trong cụm HTML của item (giống Strategy của link phim)
+        if (!url || url === "") {
+            var uuidMatch = itemHtml.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+            if (uuidMatch) {
+                return "https://surrit.com/" + uuidMatch[0] + "/preview.mp4";
+            }
+        }
+        
+        // Chuẩn hóa protocol
+        if (url && url.indexOf('//') === 0) {
+            return "https:" + url;
+        }
+        
+        return url;
     }
 };
 
 function parseListResponse(html) {
+    // Normalize HTML: strip missav_media- prefix từ CSS class
+    html = PluginUtils.normalizeHtml(html);
     var movies = [];
 
     // SPECIAL CASE: Search page uses Alpine.js + Recombee API (dynamic loading)
@@ -278,7 +324,7 @@ function parseListResponse(html) {
             // Filter flags/icons just in case
             if (img.indexOf('flag') !== -1 || img.indexOf('icon') !== -1) img = "";
 
-            var slug = url.replace("https://missav.ai", "").replace("https://missav.ai/", "/");
+            var slug = url.replace(/https?:\/\/[^\/]+/, "");
             if (slug.indexOf("/") !== 0) slug = "/" + slug;
 
             if (!foundActresses[slug]) {
@@ -311,7 +357,7 @@ function parseListResponse(html) {
                 var name = PluginUtils.cleanText(innerContent);
                 if (!name || name.length < 2) continue;
 
-                var slug = url.replace("https://missav.ai", "").replace("https://missav.ai/", "/");
+                var slug = url.replace(/https?:\/\/[^\/]+/, "");
                 if (slug.indexOf("/") !== 0) slug = "/" + slug;
 
                 // Avoid duplicates
@@ -349,7 +395,7 @@ function parseListResponse(html) {
             var fullLinkMatch = itemHtml.match(/<a[^>]+href="([^"]+)"/);
             if (fullLinkMatch) {
                 var fullUrl = fullLinkMatch[1];
-                slug = fullUrl.replace("https://missav.ai", "").replace("https://missav.ai/", "/");
+                slug = fullUrl.replace(/https?:\/\/[^\/]+/, "");
                 if (slug.indexOf("/") !== 0) slug = "/" + slug;
             }
 
@@ -426,9 +472,8 @@ function parseListResponse(html) {
                     itemHtml.indexOf("Uncensored") !== -1 ||
                     itemHtml.indexOf("bg-blue-800") !== -1;
 
-                // Extract Preview Video
-                var previewMatch = itemHtml.match(/<video[^>]+data-src="([^"]+)"/);
-                var previewUrl = previewMatch ? previewMatch[1] : "";
+                // Extract Preview Video bằng Strategy tối ưu
+                var previewUrl = PluginUtils.extractPreviewUrl(itemHtml);
 
                 movies.push({
                     id: slug,
@@ -508,7 +553,9 @@ function parseSearchResponse(html) {
     return parseListResponse(html);
 }
 
-function parseMovieDetail(html) {
+function parseMovieDetail(html, pageUrl) {
+    // Normalize HTML: strip missav_media- prefix từ CSS class
+    html = PluginUtils.normalizeHtml(html);
     try {
         // Helper to extract relative slug from full URL
         var getSlug = function (url) {
@@ -519,8 +566,8 @@ function parseMovieDetail(html) {
         // 1. Helper for specific HTML structure: 
         // <div class="text-secondary"><span>Label:</span> <tag>Value</tag></div>
         var getField = function (labelKey) {
-            // Match: <span>Label:</span> ... >Value</
-            var regex = new RegExp("<span>" + labelKey + ":<\\/span>[\\s\\S]*?>(.*?)<\\/div>", "i");
+            // Capture entire content between </span> and </div> (across newlines)
+            var regex = new RegExp("<span>" + labelKey + ":<\\/span>([\\s\\S]*?)<\\/div>", "i");
             var match = html.match(regex);
             if (!match) return "";
 
@@ -532,7 +579,17 @@ function parseMovieDetail(html) {
                 var text = PluginUtils.cleanText(linkMatch[2]);
                 return "[" + text + "](" + getSlug(url) + ")";
             }
-            // Fallback to text
+            // Check for <time> tag (e.g. release date)
+            var timeMatch = content.match(/<time[^>]*>([^<]+)<\/time>/i);
+            if (timeMatch) {
+                return PluginUtils.cleanText(timeMatch[1]);
+            }
+            // Check for <span class="font-medium"> (e.g. code, title)
+            var spanMatch = content.match(/<span[^>]*>([^<]+)<\/span>/i);
+            if (spanMatch) {
+                return PluginUtils.cleanText(spanMatch[1]);
+            }
+            // Fallback to text (strip all tags)
             return PluginUtils.cleanText(content.replace(/<[^>]+>/g, ""));
         };
 
@@ -617,31 +674,70 @@ function parseMovieDetail(html) {
         var streamUrl = "";
         var uuid = "";
 
-        // Strategy 1: Check for direct Surrit/Sixyik/Blob patterns
-        var blobMatch = html.match(/src=["']blob:[^"']+\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})["']/i);
-        var surritMatch = html.match(/surrit\.com\/([0-9a-f-]{36})/i) || html.match(/sixyik\.com\/([0-9a-f-]{36})/i);
-        var sourceMatch = html.match(/data-source=["']([^"']+)["']/i);
-
-        if (blobMatch) {
-            uuid = blobMatch[1];
-        } else if (surritMatch) {
-            uuid = surritMatch[1];
-        } else if (sourceMatch && sourceMatch[1].indexOf('m3u8') !== -1) {
-            streamUrl = sourceMatch[1];
+        // Strategy 1: Extract from eval() obfuscated code (new pattern)
+        // The source URL is now hidden inside eval(function(p,a,c,k,e,d){...})
+        // Look for the split('|') array which contains UUID parts and domain
+        var evalMatch = html.match(/eval\(function\(p,a,c,k,e,d\)[\s\S]*?'([^']+)'\.split\('\|'\)/i);
+        if (evalMatch) {
+            var parts = evalMatch[1].split('|');
+            // Look for 'surrit' or 'sixyik' in parts to confirm it's the video source eval
+            var hasSurrit = false;
+            for (var ei = 0; ei < parts.length; ei++) {
+                if (parts[ei] === 'surrit' || parts[ei] === 'sixyik') {
+                    hasSurrit = true;
+                    break;
+                }
+            }
+            if (hasSurrit) {
+                // Find UUID parts (5 hex segments) in the array
+                var uuidParts = [];
+                for (var ei = 0; ei < parts.length; ei++) {
+                    if (parts[ei].match(/^[0-9a-f]{8,12}$/)) {
+                        uuidParts.push(parts[ei]);
+                    }
+                }
+                // Try to reconstruct UUID from parts array
+                // Pattern: fa80d6f9|e876|491d|877c|f56188cab276
+                if (uuidParts.length >= 5) {
+                    uuid = uuidParts[0] + '-' + uuidParts[1] + '-' + uuidParts[2] + '-' + uuidParts[3] + '-' + uuidParts[4];
+                }
+            }
         }
 
-        // Strategy 2: Deep Scan for UUID
+        // Strategy 2: Check for direct Surrit/Sixyik/Nineyu/Fourhoi patterns
+        if (!uuid) {
+            var surritMatch = html.match(/surrit\.com\/([0-9a-f-]{36})/i) ||
+                html.match(/sixyik\.com\/([0-9a-f-]{36})/i) ||
+                html.match(/nineyu\.com\/([0-9a-f-]{36})/i) ||
+                html.match(/fourhoi\.com\/([0-9a-f-]{36})/i);
+            if (surritMatch) {
+                uuid = surritMatch[1];
+            }
+        }
+
+        // Strategy 3: Check for blob/data-source patterns
+        if (!uuid && !streamUrl) {
+            var blobMatch = html.match(/src=["']blob:[^"']+\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})["']/i);
+            var sourceMatch = html.match(/data-source=["']([^"']+)["']/i);
+            if (blobMatch) {
+                uuid = blobMatch[1];
+            } else if (sourceMatch && sourceMatch[1].indexOf('m3u8') !== -1) {
+                streamUrl = sourceMatch[1];
+            }
+        }
+
+        // Strategy 4: Deep Scan for UUID (fallback)
         if (!uuid && !streamUrl) {
             var uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
             var matches = html.match(uuidRegex) || [];
-            var blacklist = ["snaptrckr", "user_uuid", "popunder", "banner", "monitoring"];
+            var blacklist = ["snaptrckr", "user_uuid", "popunder", "banner", "monitoring", "crypto", "randomUUID", "generateUUID"];
 
             for (var i = 0; i < matches.length; i++) {
                 var u = matches[i];
                 var isBad = false;
                 var idx = html.indexOf(u);
                 if (idx !== -1) {
-                    var context = html.substring(Math.max(0, idx - 50), Math.min(html.length, idx + 50));
+                    var context = html.substring(Math.max(0, idx - 80), Math.min(html.length, idx + 80));
                     for (var j = 0; j < blacklist.length; j++) {
                         if (context.indexOf(blacklist[j]) !== -1) {
                             isBad = true; break;
@@ -658,10 +754,14 @@ function parseMovieDetail(html) {
 
         var servers = [];
         if (streamUrl) {
+            // IMPORTANT: Dùng URL gốc thay vì m3u8 URL trực tiếp
+            // Để PlayerViewModel gọi getStreamLink() → headers Referer được gắn
+            // surrit.com yêu cầu Referer header, nếu gọi trực tiếp sẽ bị 403
+            var episodeId = pageUrl || streamUrl;
             servers.push({
                 name: "Stream",
                 episodes: [{
-                    id: streamUrl,
+                    id: episodeId,
                     name: "Full",
                     slug: "full"
                 }]
@@ -701,20 +801,74 @@ function parseMovieDetail(html) {
 }
 
 function parseDetailResponse(html) {
-    var movieDetail = JSON.parse(parseMovieDetail(html));
-    var streamUrl = (movieDetail && movieDetail.servers.length > 0) ? movieDetail.servers[0].episodes[0].id : "";
+    // Extract UUID directly from HTML (independent from parseMovieDetail)
+    var uuid = "";
+    var streamUrl = "";
+
+    // Strategy 1: Decode eval() obfuscated code
+    var evalMatch = html.match(/eval\(function\(p,a,c,k,e,d\)[\s\S]*?'([^']+)'\.split\('\|'\)/i);
+    if (evalMatch) {
+        var parts = evalMatch[1].split('|');
+        var hasSurrit = false;
+        for (var i = 0; i < parts.length; i++) {
+            if (parts[i] === 'surrit' || parts[i] === 'sixyik') { hasSurrit = true; break; }
+        }
+        if (hasSurrit) {
+            var uuidParts = [];
+            for (var i = 0; i < parts.length; i++) {
+                if (parts[i].match(/^[0-9a-f]{8,12}$/)) uuidParts.push(parts[i]);
+            }
+            if (uuidParts.length >= 5) {
+                uuid = uuidParts[0] + '-' + uuidParts[1] + '-' + uuidParts[2] + '-' + uuidParts[3] + '-' + uuidParts[4];
+            }
+        }
+    }
+
+    // Strategy 2: Direct domain scan
+    if (!uuid) {
+        var m = html.match(/surrit\.com\/([0-9a-f-]{36})/i) ||
+            html.match(/sixyik\.com\/([0-9a-f-]{36})/i) ||
+            html.match(/nineyu\.com\/([0-9a-f-]{36})/i) ||
+            html.match(/fourhoi\.com\/([0-9a-f-]{36})/i);
+        if (m) uuid = m[1];
+    }
+
+    // Strategy 3: Deep UUID scan (fallback)
+    if (!uuid) {
+        var matches = html.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi) || [];
+        var blacklist = ["snaptrckr", "user_uuid", "popunder", "banner", "monitoring", "crypto", "randomUUID", "generateUUID"];
+        for (var i = 0; i < matches.length; i++) {
+            var u = matches[i];
+            var isBad = false;
+            var idx = html.indexOf(u);
+            if (idx !== -1) {
+                var ctx = html.substring(Math.max(0, idx - 80), Math.min(html.length, idx + 80));
+                for (var j = 0; j < blacklist.length; j++) {
+                    if (ctx.indexOf(blacklist[j]) !== -1) { isBad = true; break; }
+                }
+            }
+            if (!isBad) { uuid = u; break; }
+        }
+    }
+
+    if (uuid) {
+        streamUrl = "https://surrit.com/" + uuid + "/playlist.m3u8";
+    }
 
     return JSON.stringify({
         url: streamUrl,
         headers: {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Referer": "https://missav.ai/"
+            "Referer": "https://missav123.com/",
+            "Origin": "https://missav123.com"
         },
         subtitles: []
     });
 }
 
 function parseCategoriesResponse(html) {
+    // Normalize HTML: strip missav_media- prefix từ CSS class
+    html = PluginUtils.normalizeHtml(html);
     var categories = [];
 
     // Add "All Genres" as the first item
@@ -746,4 +900,3 @@ function parseCategoriesResponse(html) {
 
 function parseCountriesResponse(html) { return "[]"; }
 function parseYearsResponse(html) { return "[]"; }
-
